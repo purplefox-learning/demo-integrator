@@ -11,11 +11,17 @@ buildscript {
     }
 
     repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
         maven { url "https://artifactory.global.standardchartered.com/artifactory/maven-release" }
     }
 }
 
 repositories {
+    mavenLocal()
+    mavenCentral()
+    jcenter()
     maven { url "https://artifactory.global.standardchartered.com/artifactory/maven-release" }
 }
 
@@ -89,8 +95,8 @@ task sourceJar(type: Jar) {         //produce a jar that contain only sources, e
 //this task specify how the jar can be created
 //because this task depends on javadoc task, the execution of javadoc will create build/docs folder first
 task javadocJar(type: Jar, dependsOn: javadoc) {
-    classifier = 'javadoc'
-    from javadoc.destinationDir
+classifier = 'javadoc'
+from javadoc.destinationDir
 }
 
 //this task specify some details on how we want to generate a tar ball file
@@ -163,9 +169,8 @@ dependencies {
  	compile "io.springfox:springfox-swagger2:2.8.0"
  	compile "io.springfox:springfox-swagger-ui:2.8.0"
 
+    // automatically expose /actuator/prometheus endpoint
     runtime "io.micrometer:micrometer-registry-prometheus"
-
-    //compile 'org.apache.thrift:libthrift:0.11.0'
   
     testCompile 'org.springframework.boot:spring-boot-starter-test'
 }
@@ -214,19 +219,19 @@ publishing {    //publishing is powered by maven-publish plugin
     //}
 }
 
-artifactory {
-    contextUrl = "http://localhost:8081/artifactory"
-    publish {
-        repository {
-    repoKey = 'ycm-maven-local' //the remote artifactory repository key to publish to
-    username = "admin"          //this is my local artifactory username
-    password = "password"       //this is my local artifactory password
-    maven = true
-}
-defaults {
-    ///list of publications (defined above) from which to collect the list of artifacts to be deployed to Artifactory.
-    publications ('mavenJava')
-}
-}
-}
+//artifactory {
+//    contextUrl = "http://localhost:8081/artifactory"
+//    publish {
+//        repository {
+//            repoKey = 'ycm-maven-local' //the remote artifactory repository key to publish to
+//            username = "admin"          //this is my local artifactory username
+//            password = "password"       //this is my local artifactory password
+//            maven = true
+//        }
+//        defaults {
+//            ///list of publications (defined above) from which to collect the list of artifacts to be deployed to Artifactory.
+//            publications ('mavenJava')
+//        }
+//    }
+//}
 

@@ -1,5 +1,7 @@
 logging.level.org.springframework: INFO
 server.port: 8198
-management.security.enabled: false
 
-edmi.provider.url: http://localhost:8199
+management.security.enabled: false    # only needed in Spring boot 1.x
+management.endpoints.web.exposure.include: "*"  # only needed in Spring boot 2.0.0.RELEASE
+
+demo.provider.url: http://localhost:8199

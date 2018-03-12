@@ -19,7 +19,7 @@ public class CountryDao {
     private final RestTemplate restTemplate;
 
     @Autowired
-    public CountryDao(RestTemplate restTemplate, @Value("${edmi.provider.url}") String providerUrl) {
+    public CountryDao(RestTemplate restTemplate, @Value("${demo.provider.url}") String providerUrl) {
         this.restTemplate = restTemplate;
         this.resourceUrl = providerUrl + "/countries";
     }
