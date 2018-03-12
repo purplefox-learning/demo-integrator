@@ -1,0 +1,8 @@
+.gradle
+.log
+.idea
+
+bin
+class
+build
+target

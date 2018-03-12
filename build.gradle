@@ -1,0 +1,232 @@
+buildscript {
+    ext {
+        springBootVersion = '2.0.0.RELEASE'
+	}
+
+    dependencies {
+        classpath "io.spring.gradle:dependency-management-plugin:1.0.4.RELEASE"
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+        classpath 'gradle.plugin.com.gorylenko.gradle-git-properties:gradle-git-properties:1.4.17'
+        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:latest.release'
+    }
+
+    repositories {
+        maven { url "https://artifactory.global.standardchartered.com/artifactory/maven-release" }
+    }
+}
+
+repositories {
+    maven { url "https://artifactory.global.standardchartered.com/artifactory/maven-release" }
+}
+
+group = artifactGroup
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+apply plugin: 'org.springframework.boot'
+apply plugin: "io.spring.dependency-management"
+//produce git.properties at the /info endpoint of spring-boot-actuator
+apply plugin: "com.gorylenko.gradle-git-properties"
+
+//the distribution plugin facilitates building archives that serve as distributions of the project
+apply plugin: 'distribution'
+
+// maven-publish is one of the most essential plugin
+// with this applied, we define a publication called mavenJava (see below) in the publishing{ publications{} } block
+// which is then used by assemble/publishToMavenLocal/artifactoryPublish tasks
+// https://docs.gradle.org/current/userguide/publishing_maven.html
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.artifactory'
+
+//this code coverage plugin enable jacocoTestReport task
+//generating code coverage test report is only effective when test task is not excluded (e.g. -x)
+apply plugin: 'jacoco'
+
+//standard source sets
+sourceSets {
+    main {
+        java { srcDir 'src/main/java' }
+        //groovy { srcDir 'src/main/groovy' }
+        resources.srcDir 'src/main/resources'
+    }
+    test {
+        java { srcDir 'src/test/java' }
+        resources.srcDir 'src/test/resources'
+    }
+}
+
+sourceCompatibility = 1.8
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:Edgware.SR2"
+    }
+}
+
+configurations.all { resolutionStrategy.cacheChangingModulesFor 0, 'seconds' }
+
+springBoot {
+    buildInfo()         //this line adds META-INF/build-info.properties in the simple jar
+}
+
+jar { enabled = true }  //this line builds a simple jar, xxx.jar, which can be found at build/libs
+
+bootJar {               //from spring boot 2.0, bootJar/bootWar replaces bootRepackage
+    classifier = 'exec' //this line ask gradle to use 'exec' as postfix, xxx-exec.jar so that wont conflict with xxx.jar
+    launchScript()      //this line builds a uber/executable jar, whic can be found at bulid/libs
+}
+
+//this task specify how the jar can be created
+//when we call gradle with assemble or publishToMavenLocal with this sourceJar task registered,
+//then the xxx-source.jar will be created in the corresponding directory
+task sourceJar(type: Jar) {         //produce a jar that contain only sources, e.g. xxx-sources.jar
+    classifier "sources"
+    from sourceSets.main.allJava    //sourceSets.main.allJava is preferred than main.java
+    //from sourceSets.main.allSource works too
+}
+
+//this task specify how the jar can be created
+//because this task depends on javadoc task, the execution of javadoc will create build/docs folder first
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+//this task specify some details on how we want to generate a tar ball file
+distTar {
+    compression Compression.GZIP
+    extension "tar.gz"
+}
+
+//create a single zip/tar file with the files specified in the contents{} block
+//three tasks are supported by the distribution plugin: distTar, distZip, assembleDist
+//in this example, we want to include both fat/executable jar and javadoc in the distribution
+//but usually distTar is executed before javadocJar and sourceJar,
+//so we explicitly declare that distTar must run after javadocJar and sourceJar
+distributions {
+    main {
+        baseName = artifactName
+        contents {
+            into('/') {
+                from("$projectDir/build/libs") {
+                    include '*-exec.jar'
+                    include '*-javadoc.jar'
+                    fileMode 0755
+                }
+                //from('provisioning')
+            }
+        }
+    }
+}
+distTar.mustRunAfter javadocJar, sourceJar
+
+//this is to support 'assemble' task. when we run 'gradle assemble', both sourceJar and javadocJar will be called
+//the specification in both tasks will be used by 'assemble' task to generate the jars in
+//  build/libs/xxx-sources.jar
+//  build/libs/xxx-javadoc.jar
+//seems the simple jar and uber/fat jar is generated automatically
+artifacts {
+    archives sourceJar
+    archives javadocJar
+}
+
+dependencies {
+    compileOnly 'org.projectlombok:lombok:1.16.20'
+
+	compile 'org.springframework.boot:spring-boot-devtools'
+
+	compile 'org.springframework.boot:spring-boot-starter-web'
+	compile 'org.springframework.boot:spring-boot-starter-security'
+
+	compile 'org.springframework.boot:spring-boot-starter-jdbc'
+    compile 'com.h2database:h2:1.4.193'
+
+	compile 'org.springframework.boot:spring-boot-starter-actuator'
+
+    //hateoas = (Hypermedia as the Engine of Application State)
+    //it allows the user to navigate the site's REST interfaces dynamically by including hypermedia links with the responses.
+    //traditionally a json response of a rest request could be { "name" : "Alice" }
+    //with hateoas, the response will become like this, hence navigatable. use postman to give it a try
+    //{
+    //    "name": "Alice",
+    //    "links": [ {
+    //                   "rel": "self",
+    //                   "href": "http://localhost:8080/customer/1"
+    //               } ]
+    //}
+	compile 'org.springframework.boot:spring-boot-starter-hateoas'
+
+    // automatically enable swagger for this application at http://localhost:8199/v2/api-docs
+    // this url can then be imported to postman (very useful!)
+    // also the web ui of the swagger api can be found at http://localhost:8199/swagger-ui.html
+ 	compile "io.springfox:springfox-swagger2:2.8.0"
+ 	compile "io.springfox:springfox-swagger-ui:2.8.0"
+
+    runtime "io.micrometer:micrometer-registry-prometheus"
+
+    //compile 'org.apache.thrift:libthrift:0.11.0'
+  
+    testCompile 'org.springframework.boot:spring-boot-starter-test'
+}
+
+ext {
+    //global variables are defined and initialized here
+
+    //to pass in some value from cmd, we have 'gradle xxxTasks -PsomePasswordFromCmd=12345678
+    someAbcPassword = project.findProperty('somePasswordFromCmd') ?: 'defaultPassword'
+}
+
+//whatever artifacts defined here will get published to
+//  rootDir\build\libs              by command 'gradlew build assemble'
+//  C:\Users\xxx\.m2\repository\... by command 'gradlew build publishToMavenLocal'
+//  artifactory server              by command 'gradlew build artifactoryPublish'
+publishing {    //publishing is powered by maven-publish plugin
+    publications {
+        mavenJava(MavenPublication) {   //the name of our MavenPublication instance, we name it as mavenJava
+            from components.java    //publish the simple jar, xxx.jar
+            artifact bootJar        //publish the artifact built by bootJar task (uber/fat/executable jar)
+            artifact sourceJar      //publish the artifact built by sourceJar task
+            artifact javadocJar     //publish the artifact built by javadocJar task
+            artifact distTar        //publish the artifact built by distTar task
+
+            //optionally we may have
+            //artifact ('README.txt') {
+            //    classifier = 'README'
+            //    extension  = 'txt'
+            //}
+        }
+    }
+
+    //declare repositories for publications to be deployed to
+    //mavenLocal is automatically added, so no need to declare it here
+    //for artifactory, we use seperate plugin to handle the publishing
+    //so here we only declare all non-artifactory non-mavenLocal maven repos
+
+    //repositories {
+    //    maven {
+    //        url "http://my.company.com/mavenrepo"
+    //        credentials {
+    //            username 'xxx'
+    //            password 'someAbcPassword'  //defined in ext{} block
+    //        }
+    //    }
+    //}
+}
+
+artifactory {
+    contextUrl = "http://localhost:8081/artifactory"
+    publish {
+        repository {
+    repoKey = 'ycm-maven-local' //the remote artifactory repository key to publish to
+    username = "admin"          //this is my local artifactory username
+    password = "password"       //this is my local artifactory password
+    maven = true
+}
+defaults {
+    ///list of publications (defined above) from which to collect the list of artifacts to be deployed to Artifactory.
+    publications ('mavenJava')
+}
+}
+}
+
