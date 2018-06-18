@@ -95,8 +95,8 @@ task sourceJar(type: Jar) {         //produce a jar that contain only sources, e
 //this task specify how the jar can be created
 //because this task depends on javadoc task, the execution of javadoc will create build/docs folder first
 task javadocJar(type: Jar, dependsOn: javadoc) {
-classifier = 'javadoc'
-from javadoc.destinationDir
+    classifier = 'javadoc'
+    from javadoc.destinationDir
 }
 
 //this task specify some details on how we want to generate a tar ball file
